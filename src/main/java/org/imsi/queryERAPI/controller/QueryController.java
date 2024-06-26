@@ -39,8 +39,8 @@ public class QueryController {
 	String query = "";
 	@PostMapping("/query")
 	public ResponseEntity<String> query(@RequestParam(value = "q", required = true) String q,
-			@RequestParam(value = "page", required = false) int page, 
-			@RequestParam(value = "offset", required = false) int offset) throws JsonProcessingException, SQLException  {
+			@RequestParam(value = "page", required = false) Integer page, 
+			@RequestParam(value = "offset", required = false) Integer offset) throws JsonProcessingException, SQLException  {
 
 		return queryResult(q, page, offset);
 
@@ -50,7 +50,7 @@ public class QueryController {
 	public ResponseEntity<String> query(@RequestParam(value = "q", required = true) String q) throws JsonProcessingException, SQLException  {
 
 		return liResult(q);
-
+		
 	}
 	
 	@PostMapping("/columns")
@@ -84,7 +84,7 @@ public class QueryController {
 		return null;
 	}
 	
-	public ResponseEntity<String> queryResult(String q, int page, int offset) throws SQLException, JsonProcessingException {
+	public ResponseEntity<String> queryResult(String q, Integer page, Integer offset) throws SQLException, JsonProcessingException {
 		page +=1;
 
 		ObjectMapper mapper = new ObjectMapper();

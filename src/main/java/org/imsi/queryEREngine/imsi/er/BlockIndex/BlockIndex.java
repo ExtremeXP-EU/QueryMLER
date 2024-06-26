@@ -117,7 +117,10 @@ implements  TranslatableTable {
 		HashSet<String> stopwords = (HashSet<String>) SerializationUtilities
 				.loadSerializedObject(file);
 
-
+				// System.out.println("Stopwords:");
+				// for (String word : stopwords) {
+				// 	System.out.println(word);
+				// }
 
 
 
@@ -142,8 +145,8 @@ implements  TranslatableTable {
 				}
 			}
 		}
-		
 		this.setTfIdf(tfIdf);
+		//System.out.println("index size:" + tfIdf.size());
 		return invertedIndex;
 	}    
 

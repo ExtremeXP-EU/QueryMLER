@@ -112,7 +112,7 @@ public class EntityResolvedTuple<T> extends AbstractEnumerable<T> {
 		isGrouped = true;
 
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public void getAll() {
 		double revUFCreationStartTime = System.currentTimeMillis();

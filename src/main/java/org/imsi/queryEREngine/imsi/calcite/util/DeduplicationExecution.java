@@ -1,4 +1,5 @@
 package org.imsi.queryEREngine.imsi.calcite.util;
+import org.apache.commons.lang3.tuple.Pair;
 
 import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerable;
@@ -78,8 +79,8 @@ public class DeduplicationExecution<T> {
         boolean firstDedup = false;
 
         System.out.println("Deduplicating: " + tableName);
-        System.out.println(tokens);
-
+    //    System.err.println("tokens : " + tokens);
+        
         double deduplicateStartTime = System.currentTimeMillis();
 
         // Check for links and remove qIds that have links
@@ -116,7 +117,7 @@ public class DeduplicationExecution<T> {
         double links1Time = (linksEndTime - linksStartTime) / 1000;
 
         String queryDataSize = Integer.toString(queryData.size());
-
+        System.err.println("qdata size: " + queryDataSize);
         double blockingStartTime = System.currentTimeMillis();
         QueryBlockIndex queryBlockIndex = new QueryBlockIndex(tableName);
         queryBlockIndex.createBlockIndex(queryData, key, tokens);
@@ -127,8 +128,26 @@ public class DeduplicationExecution<T> {
         boolean doER = queryData.size() > 0 ? true : false;
 
         double blockJoinStart = System.currentTimeMillis();
-        List<AbstractBlock> blocks = queryBlockIndex
-                .joinBlockIndices(tableName, doER);
+        // List<AbstractBlock> blocks = queryBlockIndex
+        //         .joinBlockIndices(tableName, doER);
+        List<AbstractBlock> blocks;
+        HashMap<String, Set<Integer>> eqbi;
+
+        double eqbiStartTime = System.currentTimeMillis();
+        Pair<List<AbstractBlock>, HashMap<String, Set<Integer>>> result = queryBlockIndex.joinBlockIndicesReturn(tableName, doER);
+        double eqbiEndTime = System.currentTimeMillis();
+
+        System.err.println("Block indices merged in : " + (eqbiEndTime - eqbiStartTime) / 1000 + " seconds");
+
+        blocks = result.getLeft();
+        eqbi = result.getRight();
+
+        // for (Map.Entry<String, Set<Integer>> entry : eqbi.entrySet()) {
+        //     String tkey = entry.getKey();
+        //     Set<Integer> value = entry.getValue();
+        //     System.out.println("Key: " + tkey + ", Value: " + value);
+        // }
+        
         double blockJoinEnd = System.currentTimeMillis();
         String blockJoinTime = Double.toString((blockJoinEnd - blockJoinStart) / 1000);
 
@@ -141,7 +160,41 @@ public class DeduplicationExecution<T> {
         String blockSizes = getBlockSizes(blocks);
         String blockEntities = Integer.toString(queryBlockIndex.blocksToEntities(blocks).size());
 
+        double totalBlockSize = 0;
+        double maxBlockSize = 0;
+//        double totalComps = 0;
+       // System.err.println(queryData);
+        Set<String> uComparisons = new HashSet<>();
+        for (AbstractBlock block : blocks) {
+            double blockSize = block.getTotalBlockAssignments();
+            if (blockSize > maxBlockSize) maxBlockSize = blockSize;
+            totalBlockSize += blockSize;
 
+            // QueryComparisonIterator it = block.getQueryComparisonIterator(qIds);
+            // Set<Integer> uIds = new HashSet<>();
+            // while(it.hasNext()){
+            //     String uniqueComp = "";
+            //     Comparison comp = it.next();
+            //     int id1 = comp.getEntityId1();
+            //     int id2 = comp.getEntityId2();
+            //     if (id1 > id2)
+			// 		uniqueComp = id1 + "u" + id2;
+			// 	else
+			// 		uniqueComp = id2 + "u" + id1;
+			// 	if (uComparisons.contains(uniqueComp))
+			// 		continue;
+            //     uIds.add(id1);
+            //     uIds.add(id2);
+			// 	uComparisons.add(uniqueComp);
+            // };
+            // System.err.println((uIds.stream().map(m -> "'" + m + "'").collect(Collectors.joining(","))));
+         //   System.out.println(j);
+            // System.out.println(queryBlockIndex);
+  //          totalComps += block.getNoOfComparisons();
+  
+        }
+        
+       System.out.println(totalBlockSize);
         //sort queryblockindex  by size of values   (block size)
 
 //        queryBlockIndex.sortIndex();
@@ -155,76 +208,17 @@ public class DeduplicationExecution<T> {
 //        });
 
 
-            // META BLOCKING
+// try {
+//     storeBlocks(blocks, tableName);
+// }
+// catch (Exception e){
+//     e.printStackTrace();
+// }
+//             // META BLOCKING
 
 
-        // PURGING
-        double blockPurgingStartTime = System.currentTimeMillis();
-
-        ComparisonsBasedBlockPurging blockPurging = new ComparisonsBasedBlockPurging();
-        if (deduplicationProperties.isRunBP()) blockPurging.applyProcessing(blocks);
-
-        double blockPurgingEndTime = System.currentTimeMillis();
-
-        String purgingBlocksSize = Integer.toString(blocks.size());
-        String purgingTime = Double.toString((blockPurgingEndTime - blockPurgingStartTime) / 1000);
-        String purgingBlockSizes = getBlockSizes(blocks);
-        int entities = queryBlockIndex.blocksToEntities(blocks).size();
-        String purgeBlockEntities = Integer.toString(entities);
-
-        String filterBlocksSize = "";
-        String filterTime = "";
-        String filterBlockSizes = "";
-        String epTime = "";
-        String epTotalComps = "";
-        String filterBlockEntities = "";
-        String ePEntities = "";
-        boolean epFlag = false;
-        if (blocks.size() > 10) {
-            // FILTERING
-            double blockFilteringStartTime = System.currentTimeMillis();
-            org.imsi.queryEREngine.imsi.er.EfficiencyLayer.MetaBlocking.BlockFiltering bFiltering = new org.imsi.queryEREngine.imsi.er.EfficiencyLayer.MetaBlocking.BlockFiltering(deduplicationProperties.getFilterParam());
-            if (deduplicationProperties.isRunBF()) bFiltering.applyProcessing(blocks);
-            double blockFilteringEndTime = System.currentTimeMillis();
-            filterBlocksSize = Integer.toString(blocks.size());
-            filterTime = Double.toString((blockFilteringEndTime - blockFilteringStartTime) / 1000);
-            filterBlockSizes = getBlockSizes(blocks);
-            filterBlockEntities = Integer.toString(queryBlockIndex.blocksToEntities(blocks).size());
-
-            blocks.remove(blocks.size() - 1);
-
-            // EDGE PRUNING
-            double edgePruningStartTime = System.currentTimeMillis();
-            CardinalityEdgePruning eEP = new CardinalityEdgePruning(org.imsi.queryEREngine.imsi.er.EfficiencyLayer.MetaBlocking.WeightingScheme.ECBS, qIds, selectivity);
-            if (deduplicationProperties.isRunEP()) {
-                eEP.applyProcessing(blocks);
-                double edgePruningEndTime = System.currentTimeMillis();
-
-                epTime = Double.toString((edgePruningEndTime - edgePruningStartTime) / 1000);
-                double totalComps = 0;
-                for (AbstractBlock block : blocks) {
-                    totalComps += block.getNoOfComparisons();
-                }
-                epTotalComps = Double.toString(totalComps);
-                ePEntities = Integer.toString(queryBlockIndex.blocksToEntitiesD(blocks).size());
-                epFlag = true;
-            }
-        }
-        //Get ids of final entities, and add back qIds that were cut from m-blocking
-        Set<Integer> blockQids = new HashSet<>();
-        if (epFlag)
-            blockQids = queryBlockIndex.blocksToEntitiesD(blocks);
-        else
-            blockQids = queryBlockIndex.blocksToEntities(blocks);
-        totalIds.addAll(blockQids);
-        totalIds.addAll(qIds);
-
-        try {
-            storeBlocks(blocks, tableName);
-        }
-        catch (Exception e){
-            e.printStackTrace();
-        }
+        System.err.println("At start: " + blocks.size());
+  
 
         DeduplicationExecution.qIds = qIds;
         // To find ground truth statistics
@@ -237,41 +231,176 @@ public class DeduplicationExecution<T> {
             e.printStackTrace();
         }
 
-        double comparisonStartTime = System.currentTimeMillis();
 
         // Merge queryData with dataWithLinks
 
         queryData = mergeMaps(queryData, dataWithLinks);
-        ExecuteBlockComparisons<?> ebc = new ExecuteBlockComparisons(queryData, randomAccessReader);
+        ExecuteBlockComparisons<?> ebc = new ExecuteBlockComparisons(queryData, eqbi, randomAccessReader);
         EntityResolvedTuple<?> entityResolvedTuple = ebc.comparisonExecutionAll(blocks, qIdsNoLinks, key, noOfAttributes,tableName);
         double comparisonEndTime = System.currentTimeMillis();
         double links2StartTime = System.currentTimeMillis();
         entityResolvedTuple.mergeLinks(links, tableName, firstDedup, totalIds, deduplicationProperties.isRunLinks());
         double links2EndTime = System.currentTimeMillis();
 
+
+
+
         Integer executedComparisons = entityResolvedTuple.getComparisons();
         int matches = entityResolvedTuple.getMatches();
         int totalEntities = entityResolvedTuple.data.size();
         double jaroTime = entityResolvedTuple.getCompTime();
-        double deduplicateEndTime = System.currentTimeMillis();
+        // double deduplicateEndTime = System.currentTimeMillis();
         double revUfCreationTime = entityResolvedTuple.getRevUFCreationTime();
-        String comparisonTime = Double.toString((comparisonEndTime - comparisonStartTime) / 1000);
-        String totalDeduplicationTime = Double.toString((deduplicateEndTime - deduplicateStartTime) / 1000);
-        String linksTime = Double.toString(links1Time + ((links2EndTime - links2StartTime) / 1000));
+        // String comparisonTime = Double.toString((comparisonEndTime - comparisonStartTime) / 1000);
+        // String totalDeduplicationTime = Double.toString((deduplicateEndTime - deduplicateStartTime) / 1000);
+        // String linksTime = Double.toString(links1Time + ((links2EndTime - links2StartTime) / 1000));
+
+
+
+
+//         // PURGING
+//         double blockPurgingStartTime = System.currentTimeMillis();
+
+//         ComparisonsBasedBlockPurging blockPurging = new ComparisonsBasedBlockPurging();
+//         if (deduplicationProperties.isRunBP()) blockPurging.applyProcessing(blocks);
+
+//         double blockPurgingEndTime = System.currentTimeMillis();
+
+//         String purgingBlocksSize = Integer.toString(blocks.size());
+//         String purgingTime = Double.toString((blockPurgingEndTime - blockPurgingStartTime) / 1000);
+//         System.err.println("Purging Time: " + purgingTime);
+//         String purgingBlockSizes = getBlockSizes(blocks);
+//         int entities = queryBlockIndex.blocksToEntities(blocks).size();
+//         String purgeBlockEntities = Integer.toString(entities);
+
+//         String filterBlocksSize = "";
+//         String filterTime = "";
+//         String filterBlockSizes = "";
+//         String epTime = "";
+//         String epTotalComps = "";
+//         String filterBlockEntities = "";
+//         String ePEntities = "";
+//         boolean epFlag = false;
+//        System.err.println("After purging: " + blocks.size());
+//         totalBlockSize = 0;
+//         maxBlockSize = 0;
+// //        double totalComps = 0;
+//         for (AbstractBlock block : blocks) {
+//             double blockSize = block.getTotalBlockAssignments();
+//             if (blockSize > maxBlockSize) maxBlockSize = blockSize;
+//             totalBlockSize += blockSize;
+//   //          totalComps += block.getNoOfComparisons();
+//         }
+//         System.out.println(totalBlockSize);
+
+//         if (blocks.size() > 10) {
+//             // FILTERING
+//             double blockFilteringStartTime = System.currentTimeMillis();
+//             org.imsi.queryEREngine.imsi.er.EfficiencyLayer.MetaBlocking.BlockFiltering bFiltering = new org.imsi.queryEREngine.imsi.er.EfficiencyLayer.MetaBlocking.BlockFiltering(deduplicationProperties.getFilterParam());
+//             if (deduplicationProperties.isRunBF()) bFiltering.applyProcessing(blocks);
+//             double blockFilteringEndTime = System.currentTimeMillis();
+//             filterBlocksSize = Integer.toString(blocks.size());
+//             filterTime = Double.toString((blockFilteringEndTime - blockFilteringStartTime) / 1000);
+//             filterBlockSizes = getBlockSizes(blocks);
+//             filterBlockEntities = Integer.toString(queryBlockIndex.blocksToEntities(blocks).size());
+//             System.err.println("Filtering Time: " + filterTime);
+
+//             blocks.remove(blocks.size() - 1);
+//             System.err.println("After filtering: " + blocks.size());
+//             totalBlockSize = 0;
+//             maxBlockSize = 0;
+//             double comps = 0;
+//             for (AbstractBlock block : blocks) {
+//                 double blockSize = block.getTotalBlockAssignments();
+//                 if (blockSize > maxBlockSize) maxBlockSize = blockSize;
+//                 totalBlockSize += blockSize;
+//                 comps += block.getNoOfComparisons();
+//             }
+//             System.out.println(totalBlockSize);
+//             System.out.println("total comps: " + comps);
+//             // EDGE PRUNING
+//             double edgePruningStartTime = System.currentTimeMillis();
+//             CardinalityEdgePruning eEP = new CardinalityEdgePruning(org.imsi.queryEREngine.imsi.er.EfficiencyLayer.MetaBlocking.WeightingScheme.ECBS, qIds, selectivity);
+//             if (deduplicationProperties.isRunEP()) {
+//                 eEP.applyProcessing(blocks);
+//                 double edgePruningEndTime = System.currentTimeMillis();
+
+//                 epTime = Double.toString((edgePruningEndTime - edgePruningStartTime) / 1000);
+//                 System.err.println("Pruning Time: " + epTime);
+
+//                 double totalComps = 0;
+//                 for (AbstractBlock block : blocks) {
+//                     totalComps += block.getNoOfComparisons();
+//                 }
+//                 epTotalComps = Double.toString(totalComps);
+//                 ePEntities = Integer.toString(queryBlockIndex.blocksToEntitiesD(blocks).size());
+//                 epFlag = true;
+//               System.out.println("totalcomps2 : " +totalComps);
+//                 System.out.println("epentities : " + ePEntities);
+//             }
+//         }
+        //Get ids of final entities, and add back qIds that were cut from m-blocking
+        // Set<Integer> blockQids = new HashSet<>();
+        // if (epFlag)
+        //     blockQids = queryBlockIndex.blocksToEntitiesD(blocks);
+        // else
+        //     blockQids = queryBlockIndex.blocksToEntities(blocks);
+        // totalIds.addAll(blockQids);
+        // totalIds.addAll(qIds);
+
+        // try {
+        //     storeBlocks(blocks, tableName);
+        // }
+        // catch (Exception e){
+        //     e.printStackTrace();
+        // }
+
+        // DeduplicationExecution.qIds = qIds;
+        // // To find ground truth statistics
+        // DeduplicationExecution.blocks = blocks;
+
+        // RandomAccessReader randomAccessReader = null;
+        // try {
+        //     randomAccessReader = RandomAccessReader.open(new File(source));
+        // } catch (IOException e) {
+        //     e.printStackTrace();
+        // }
+
+        // double comparisonStartTime = System.currentTimeMillis();
+
+        // // Merge queryData with dataWithLinks
+
+        // queryData = mergeMaps(queryData, dataWithLinks);
+        // ExecuteBlockComparisons<?> ebc = new ExecuteBlockComparisons(queryData, randomAccessReader);
+        // EntityResolvedTuple<?> entityResolvedTuple = ebc.comparisonExecutionAll(blocks, qIdsNoLinks, key, noOfAttributes,tableName);
+        // double comparisonEndTime = System.currentTimeMillis();
+        // double links2StartTime = System.currentTimeMillis();
+        // entityResolvedTuple.mergeLinks(links, tableName, firstDedup, totalIds, deduplicationProperties.isRunLinks());
+        // double links2EndTime = System.currentTimeMillis();
+
+        // Integer executedComparisons = entityResolvedTuple.getComparisons();
+        // int matches = entityResolvedTuple.getMatches();
+        // int totalEntities = entityResolvedTuple.data.size();
+        // double jaroTime = entityResolvedTuple.getCompTime();
+        // double deduplicateEndTime = System.currentTimeMillis();
+        // double revUfCreationTime = entityResolvedTuple.getRevUFCreationTime();
+        // String comparisonTime = Double.toString((comparisonEndTime - comparisonStartTime) / 1000);
+        // String totalDeduplicationTime = Double.toString((deduplicateEndTime - deduplicateStartTime) / 1000);
+        // String linksTime = Double.toString(links1Time + ((links2EndTime - links2StartTime) / 1000));
 
         // Log everything
-        try {
-            FileWriter logWriter = new FileWriter(dumpDirectories.getLogsDirPath(), true);
-            logWriter.write(tableName + "," + queryDataSize + "," + scanTime + "," + linksTime + "," + blockJoinTime + "," + blockingTime + "," + blocksSize + "," +
-                    blockSizes + "," + blockEntities + "," + purgingBlocksSize + "," + purgingTime + "," + purgingBlockSizes + "," +
-                    purgeBlockEntities + "," + filterBlocksSize + "," + filterTime + "," + filterBlockSizes + "," + filterBlockEntities + "," +
-                    epTime + "," + epTotalComps + "," + ePEntities + "," + matches + "," + executedComparisons + "," + jaroTime + "," +
-                    comparisonTime + "," + revUfCreationTime + "," + totalEntities + "," + totalDeduplicationTime + "\n");
-            logWriter.close();
-        } catch (IOException e) {
-            System.out.println("Log file creation error occurred.");
-            e.printStackTrace();
-        }
+        // try {
+        //     FileWriter logWriter = new FileWriter(dumpDirectories.getLogsDirPath(), true);
+        //     logWriter.write(tableName + "," + queryDataSize + "," + scanTime + "," + linksTime + "," + blockJoinTime + "," + blockingTime + "," + blocksSize + "," +
+        //             blockSizes + "," + blockEntities + "," + purgingBlocksSize + "," + purgingTime + "," + purgingBlockSizes + "," +
+        //             purgeBlockEntities + "," + filterBlocksSize + "," + filterTime + "," + filterBlockSizes + "," + filterBlockEntities + "," +
+        //             epTime + "," + epTotalComps + "," + ePEntities + "," + matches + "," + executedComparisons + "," + jaroTime + "," +
+        //             comparisonTime + "," + revUfCreationTime + "," + totalEntities + "," + totalDeduplicationTime + "\n");
+        //     logWriter.close();
+        // } catch (IOException e) {
+        //     System.out.println("Log file creation error occurred.");
+        //     e.printStackTrace();
+        // }
 
 
         return entityResolvedTuple;
@@ -332,7 +461,6 @@ public class DeduplicationExecution<T> {
     }
 
     private static double storeBlocks(List<AbstractBlock> blocks, String tableName) throws IOException {
-        System.out.println(blocks.size());
         double startTime = System.currentTimeMillis();
         //List<DecomposedBlock> dBlocks = (List<DecomposedBlock>) (List<? extends AbstractBlock>) blocks;
         //SerializationUtilities.storeSerializedObject(dBlocks, dumpDirectories.getBlockDirPath());
@@ -352,7 +480,6 @@ public class DeduplicationExecution<T> {
                 j++;
                 String uniqueComp = "";
                 Comparison comp = it.next();
-                
                 int id1 = comp.getEntityId1();
                 int id2 = comp.getEntityId2();
                 if (id1 > id2)
@@ -367,13 +494,17 @@ public class DeduplicationExecution<T> {
                 csvWriter.append(tableName).append("_").append(String.valueOf(id1)).append(",")
                         .append(tableName).append("_").append(String.valueOf(id2)).append("\n");
             };
+         //   System.out.println(j);
+
             blocksWriter.append("[");
             blocksWriter.append(uIds.stream().map(m -> "'" + tableName + "_" + m + "'").collect(Collectors.joining(",")));
             blocksWriter.append("]");
+         //   System.out.println(j);
         }
-        csvWriter.flush();;
+        csvWriter.flush();
         blocksWriter.append("]");
         blocksWriter.flush();
+   //     System.out.println(i);
         return System.currentTimeMillis() - startTime;
     }
 

@@ -4,6 +4,10 @@ import org.apache.arrow.flight.*;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.arrow.vector.types.pojo.ArrowType;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
@@ -42,6 +46,21 @@ public class ArrowFlightConnector {
      * @return VectorSchemaRoot table with all the resulting data
      */
     public void putData(VectorSchemaRoot vsr, String descriptor){
+        Schema schema = vsr.getSchema();
+    
+        // Print the schema to inspect it
+        System.out.println("Schema: " + schema.toString());
+        // for (Field field : schema.getFields()) {
+        //     System.out.println("Field: " + field.getName() + ", Type: " + field.getFieldType());
+            
+        //     if (field.getFieldType().getType() instanceof ArrowType.List) {
+        //         // If the field is a list, find its child field by name
+        //         ArrowType.List listType = (ArrowType.List) field.getFieldType().getType();
+        //         String childFieldName = listType.getField().getName();
+        //         System.out.println("Child Field Name of " + field.getName() + ": " + childFieldName);
+        //     }
+        // }
+    
         FlightClient.ClientStreamListener listener = client.startPut(
                 FlightDescriptor.path(descriptor),
                 vsr, new AsyncPutListener());
@@ -68,7 +87,6 @@ public class ArrowFlightConnector {
         return vectorSchemaRootReceived;
 
     }
-
 
     /**
      * Asks the server if the prediction results are ready.

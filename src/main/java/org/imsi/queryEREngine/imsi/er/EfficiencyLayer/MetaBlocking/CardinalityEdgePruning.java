@@ -67,7 +67,9 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
         double s = System.currentTimeMillis();
         initializeEntityIndex(blocks);
 //        System.out.println("Statistics: " + (System.currentTimeMillis() - s) / 1000);
+        
         getKThreshold(blocks);
+        System.out.println("hello from 72");
         filterComparisons(blocks);
         gatherComparisons(blocks);
     }
@@ -163,13 +165,13 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
             tbc += block.getNoOfComparisons();
         }
 
-        System.err.println("total comparison / ass: " + tbc + " / " + blockAssingments);
+        System.out.println("total comparison / ass: " + tbc + " / " + blockAssingments);
 //        kThreshold = Math.max(Math.round(blockAssingments * (selectivity + 0.35)), Math.round(blockAssingments * 0.5));
         kThreshold = Math.min(Math.round(tbc * (selectivity + 0.35)), Math.round(tbc * 0.5));
 //        kThreshold = Math.min(kThreshold, Math.round(blockAssingments * 0.8));
-        kThreshold = Math.round(blockAssingments);
-        System.err.println("threshold: " + kThreshold + " / tbc: " + tbc);
-
+        //kThreshold = Math.round(blockAssingments);
+        System.out.println("threshold: " + kThreshold + " / tbc: " + tbc);
+        System.out.println("delelelelelele");
 //        kThreshold = Math.max(Math.round(blockAssingments *  (selectivity + 0.35)), Math.round(blockAssingments * 0.5));
 //        kThreshold = Math.min(kThreshold, Math.round(blockAssingments * 0.8));
         kThreshold = Math.round(blockAssingments);

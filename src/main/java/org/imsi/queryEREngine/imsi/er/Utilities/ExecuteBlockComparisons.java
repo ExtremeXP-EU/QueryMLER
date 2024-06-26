@@ -14,6 +14,7 @@ import org.imsi.queryEREngine.imsi.calcite.util.DeduplicationExecution;
 import org.imsi.queryEREngine.imsi.er.DataStructures.AbstractBlock;
 import org.imsi.queryEREngine.imsi.er.DataStructures.Comparison;
 import org.imsi.queryEREngine.imsi.er.DataStructures.EntityResolvedTuple;
+import org.imsi.queryEREngine.imsi.er.DataStructures.UnilateralBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +35,7 @@ import org.apache.arrow.flight.FlightClient;
 import org.apache.arrow.flight.FlightDescriptor;
 import org.apache.arrow.flight.FlightEndpoint;
 import org.apache.arrow.flight.FlightInfo;
+import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.flight.FlightServer;
 import org.apache.arrow.flight.FlightStream;
 import org.apache.arrow.flight.Location;
@@ -49,10 +51,13 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
+import java.util.stream.Collectors;
+
 
 public class ExecuteBlockComparisons<T> {
 
     private HashMap<Integer, Object[]> newData = new HashMap<>();
+    private HashMap<String, Set<Integer>> eqbi = new HashMap<>();
     private RandomAccessReader randomAccessReader;
     public static Set<String> matches;
     protected static final Logger DEDUPLICATION_EXEC_LOGGER = LoggerFactory.getLogger(DeduplicationExecution.class);
@@ -67,9 +72,10 @@ public class ExecuteBlockComparisons<T> {
         this.randomAccessReader = randomAccessReader;
     }
 
-    public ExecuteBlockComparisons(HashMap<Integer, Object[]> queryData, RandomAccessReader randomAccessReader) {
+    public ExecuteBlockComparisons(HashMap<Integer, Object[]> queryData, HashMap<String, Set<Integer>> eqbi, RandomAccessReader randomAccessReader) {
         this.randomAccessReader = randomAccessReader;
         this.newData = queryData;
+        this.eqbi = eqbi;
         CsvParserSettings parserSettings = new CsvParserSettings();
         parserSettings.setNullValue("");
         parserSettings.setEmptyValue("");
@@ -95,6 +101,8 @@ public class ExecuteBlockComparisons<T> {
         int comparisons = 0;
         UnionFind uFind = new UnionFind(qIds);
 
+        // System.err.println("qids are: " + qIds);
+        // System.err.println("blocks are: " + blocks);
 //		Set<AbstractBlock> nBlocks = new HashSet<>(blocks);
 //		Set<String> uComparisons = new HashSet<>();
         HashMap<Integer, HashMap<Integer, Double>> similarities = new HashMap<>();
@@ -107,75 +115,126 @@ public class ExecuteBlockComparisons<T> {
 
 
         // Make arrow data handler that holds pairs and the newdata dictionary (hashmap)
-        ArrowDataHandler arrowHandler = new ArrowDataHandler(newData);
+
+        double dataCollectionStartTime = System.currentTimeMillis();
+
+        ArrowDataHandler arrowHandler = new ArrowDataHandler(newData, eqbi);
+
+// //            ComparisonIterator iterator = block.getComparisonIterator();
+// 			QueryComparisonIterator iterator = block.getQueryComparisonIterator(qIds);
+
+//             while (iterator.hasNext()) {
+//                 Comparison comparison = iterator.next();
+//                 int id1 = comparison.getEntityId1();
+//                 int id2 = comparison.getEntityId2();
+//              //   System.err.println("ids are: " + id1 + ", " + id2);
+
+// //				if (!qIds.contains(id1) && !qIds.contains(id2))
+// //					continue;
+// //				String uniqueComp = "";
+// //				if (comparison.getEntityId1() > comparison.getEntityId2())
+// //					uniqueComp = id1 + "u" + id2;
+// //				else
+// //					uniqueComp = id2 + "u" + id1;
+// //				if (uComparisons.contains(uniqueComp))
+// //					continue;
+// //				uComparisons.add(uniqueComp);
+
+//                 Object[] entity1 = getEntity(offsetIds.get(id1), id1);
+//                 Object[] entity2 = getEntity(offsetIds.get(id2), id2);
+
+// //                if (uFind.isInSameSet(id1, id2)){
+// //                    System.err.println("Same Set");
+// //                    System.err.println(id1+"  "+id2+"  "+uFind.isInSameSet(id1, id2));
+// //                    System.err.println(uFind.find(id1)+"  "+uFind.find(id2));
+// //
+// //                    continue;
+// //                }
+//                 if (uFind.isInSameSet(id1, id2)){
+// //                    uFind.union(id1,id2);
+//                     continue;
+//                 }
+
+//                 arrowHandler.addPair(id1, id2);
+
+// //                Comparisons: 23227
+// //                ufind size: 3397
 
 
-        for (AbstractBlock block : blocks) {
-//            ComparisonIterator iterator = block.getComparisonIterator();
-			QueryComparisonIterator iterator = block.getQueryComparisonIterator(qIds);
-
-            while (iterator.hasNext()) {
-                Comparison comparison = iterator.next();
-                int id1 = comparison.getEntityId1();
-                int id2 = comparison.getEntityId2();
-//				if (!qIds.contains(id1) && !qIds.contains(id2))
-//					continue;
-//				String uniqueComp = "";
-//				if (comparison.getEntityId1() > comparison.getEntityId2())
-//					uniqueComp = id1 + "u" + id2;
-//				else
-//					uniqueComp = id2 + "u" + id1;
-//				if (uComparisons.contains(uniqueComp))
-//					continue;
-//				uComparisons.add(uniqueComp);
-
-                Object[] entity1 = getEntity(offsetIds.get(id1), id1);
-                Object[] entity2 = getEntity(offsetIds.get(id2), id2);
-
-//                if (uFind.isInSameSet(id1, id2)){
-//                    System.err.println("Same Set");
-//                    System.err.println(id1+"  "+id2+"  "+uFind.isInSameSet(id1, id2));
-//                    System.err.println(uFind.find(id1)+"  "+uFind.find(id2));
-//
-//                    continue;
-//                }
-                if (uFind.isInSameSet(id1, id2)){
-//                    uFind.union(id1,id2);
-                    continue;
-                }
-
-                arrowHandler.addPair(id1, id2);
-
-//                Comparisons: 23227
-//                ufind size: 3397
-
-
-//                double compStartTime = System.currentTimeMillis();
-//                double similarity = ProfileComparison.getJaccardSimilarity(entity1, entity2, keyIndex);
-//                double compEndTime = System.currentTimeMillis();
-//                compTime += compEndTime - compStartTime;
-//                comparisons++;
-//                if (similarity >= 0.92) {
-//                    //matches.add(uniqueComp);
-//                    uFind.union(id1, id2);
-//                    //for id1
-//                    HashMap<Integer, Double> similarityValues = similarities.computeIfAbsent(id1, x -> new HashMap<>());
-//                    similarityValues.put(id2, similarity);
-//                    // for id2
-//                    similarityValues = similarities.computeIfAbsent(id2, x -> new HashMap<>());
-//                    similarityValues.put(id1, similarity);
-//                }
-            }
-        }
+// //                double compStartTime = System.currentTimeMillis();
+// //                double similarity = ProfileComparison.getJaccardSimilarity(entity1, entity2, keyIndex);
+// //                double compEndTime = System.currentTimeMillis();
+// //                compTime += compEndTime - compStartTime;
+// //                comparisons++;
+// //                if (similarity >= 0.92) {
+// //                    //matches.add(uniqueComp);
+// //                    uFind.union(id1, id2);
+// //                    //for id1
+// //                    HashMap<Integer, Double> similarityValues = similarities.computeIfAbsent(id1, x -> new HashMap<>());
+// //                    similarityValues.put(id2, similarity);
+// //                    // for id2
+// //                    similarityValues = similarities.computeIfAbsent(id2, x -> new HashMap<>());
+// //                    similarityValues.put(id1, similarity);
+// //                }
+//             }
+//         }
 
         /* Generate the dictionary arrow table using data provided at construction */
         arrowHandler.addDictData();
 
+        double dataCollectionEndTime = System.currentTimeMillis();
 
+        System.err.println("Arrow Vectors created in: " + (dataCollectionEndTime - dataCollectionStartTime) / 1000 + " seconds");
+
+      //  arrowHandler.addEqbiData();
+        
         /* Initiate a connection, request a bert inference, wait for results, store them in unionFind */
         try{
-            ArrowFlightConnector connector = new ArrowFlightConnector(8080);
-            connector.putData(arrowHandler.fetchPairs(), "pairs");
+            ArrowFlightConnector connector = new ArrowFlightConnector(5678);
+
+
+           // VectorSchemaRoot pairsRoot = arrowHandler.fetchPairs();
+            VectorSchemaRoot dictRoot = arrowHandler.fetchDict();
+            VectorSchemaRoot eqbiRoot = arrowHandler.fetchEqbi();
+            // for (FieldVector vector : pairsRoot.getFieldVectors()) {
+            //     System.out.println("Vector: " + vector.getField().getName());
+            //     for (int i = 0; i < vector.getValueCount(); i++) {
+            //         System.out.println(vector.getObject(i));
+            //     }
+            //}
+            // for (FieldVector vector : eqbiRoot.getFieldVectors()) {
+            //     System.out.println("Vector: " + vector.getField().getName());
+            //     for (int i = 0; i < vector.getValueCount(); i++) {
+            //         System.err.println("el1");
+            //         System.out.println(vector.getObject(i));
+            //         System.err.println("el2s");
+            //     }
+            // }
+            // Get the key vector
+            System.err.println(eqbiRoot.getRowCount());
+            VarCharVector keyVector = (VarCharVector) eqbiRoot.getVector("key");
+            // Get the values vector
+            ListVector valuesVector = (ListVector) eqbiRoot.getVector("values");
+            // Iterate over the data and print each key-value pair
+            // for (int i = 0; i < eqbiRoot.getRowCount(); i++) {
+            //     // Print the key
+            //     System.err.println("el1");
+            //     byte[] keyBytes = keyVector.get(i);
+            //     String key = new String(keyBytes, StandardCharsets.UTF_8);
+            //     System.out.println("Key: " + key);
+            
+            //     // Print the values
+            //     List<Integer> values = new ArrayList<>();
+            //     for (int j = 0; j < valuesVector.getValueCount(); j++) {
+            //         int value = ((IntVector) valuesVector.getDataVector()).get(j);
+            //         values.add(value);
+            //     }
+            //     System.out.println("Values: " + values);
+            // }
+            
+
+        //    connector.putData(arrowHandler.fetchPairs(), "pairs");
+            connector.putData(arrowHandler.fetchEqbi(), "eqbi");
             connector.putData(arrowHandler.fetchDict(),  "dict");
             connector.doAction("bert_inference", "null");
             while(!connector.isPredictionReady()){
@@ -185,7 +244,6 @@ public class ExecuteBlockComparisons<T> {
             VectorSchemaRoot results = connector.getData("results");
             UInt4Vector id1s = (UInt4Vector) results.getVector("id1");
             UInt4Vector id2s = (UInt4Vector) results.getVector("id2");
-            System.out.println(id1s.getValueCount());
 
             for(int i = 0; i < id1s.getValueCount(); i++){
                 uFind.union(id1s.get(i), id2s.get(i));

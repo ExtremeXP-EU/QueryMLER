@@ -1,4 +1,5 @@
 package org.imsi.queryEREngine.imsi.er.BlockIndex;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.imsi.queryEREngine.imsi.er.DataStructures.*;
@@ -58,7 +59,7 @@ public class QueryBlockIndex extends BlockIndex {
                 blocks.add(uBlock);
             }
         }
-        invertedIndex.clear();
+     //   invertedIndex.clear();
         return blocks;
     }
 
@@ -151,6 +152,20 @@ public class QueryBlockIndex extends BlockIndex {
         } else return new ArrayList<>();
     }
 
+    @SuppressWarnings("unchecked")
+    public Pair<List<AbstractBlock>, HashMap<String, Set<Integer>>> joinBlockIndicesReturn(String name, boolean doER) {
+        if (doER) {
+            DumpDirectories dumpDirectories = new DumpDirectories();
+            final HashMap<String, Set<Integer>> bBlocks = (HashMap<String, Set<Integer>>) SerializationUtilities
+                    .loadSerializedObject(dumpDirectories.getBlockIndexDirPath() + name + "InvertedIndex");
+            bBlocks.keySet().retainAll(this.invertedIndex.keySet());
+            List<AbstractBlock> blocks = parseIndex(bBlocks, qIds);
+            return Pair.of(blocks, bBlocks);
+        } else {
+            return Pair.of(new ArrayList<>(), new HashMap<>());
+        }
+    }
+
     public Set<Integer> blocksToEntities(List<AbstractBlock> blocks) {
         Set<Integer> joinedEntityIds = new HashSet<>();
 //        if (blocks.get(0) instanceof UnilateralBlock) {
@@ -179,7 +194,6 @@ public class QueryBlockIndex extends BlockIndex {
             int[] entities2 = dBlock.getEntities2();
             joinedEntityIds.addAll(Arrays.stream(entities1).boxed().collect(Collectors.toSet()));
             joinedEntityIds.addAll(Arrays.stream(entities2).boxed().collect(Collectors.toSet()));
-
         }
         return joinedEntityIds;
     }

@@ -44,7 +44,7 @@ public class ComparisonsBasedBlockPurging extends AbstractEfficiencyMethod {
     @Override
     public void applyProcessing(List<AbstractBlock> blocks) {
         double maxComparisonsPerBlock = getMaxComparisonsPerBlock(blocks);
-
+        System.err.println("Max comps per block is: " + maxComparisonsPerBlock);
         Iterator blocksIterator = blocks.iterator();
         while (blocksIterator.hasNext()) {
             AbstractBlock currentBlock = (AbstractBlock) blocksIterator.next();
@@ -82,7 +82,6 @@ public class ComparisonsBasedBlockPurging extends AbstractEfficiencyMethod {
                 blockAssignments[index] = blockAssignments[index-1];
                 totalComparisonsPerLevel[index] = totalComparisonsPerLevel[index-1];
             }
-
             blockAssignments[index] += block.getTotalBlockAssignments();
             totalComparisonsPerLevel[index] += block.getNoOfComparisons();
         }

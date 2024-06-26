@@ -81,7 +81,6 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
     protected void filterComparisons(List<AbstractBlock> blocks) {
         minimumWeight = Double.MIN_VALUE;
         topKEdges = new PriorityQueue<Comparison>((int) (2 * kThreshold), new ComparisonWeightComparator());
-
         HashMap<Double, Integer> weightLevels = new HashMap<>();
 
         int ccounter = 0;
@@ -100,6 +99,7 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
 
             HashSet<Comparison> uComp = new HashSet<>();
             QueryComparisonIterator iterator = block.getQueryComparisonIterator(qIds);
+            //System.err.println("limit is: " + limit);
             while (iterator.hasNext()) {
                 Comparison comparison = iterator.next();
                 int entity1 = comparison.getEntityId1();
@@ -123,6 +123,8 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
                 if (weight < 0 || weight < averageWeight || weight < minimumWeight) {
                     continue;
                 }
+                //System.out.println("avrgWeight: " + averageWeight);
+                //System.err.println("minmWeight: " + min);
                 comparison.setUtilityMeasure(weight);
                 addComparison(comparison);
                 if (counter < limit) mean += weight;
@@ -135,35 +137,41 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
                 }
                 counter++;
             }
+            
         }
+      //  System.err.println("counter is: " + counter);
         System.err.println("sss " + cc + "  " + averageWeight + " queue size: " + topKEdges.size());
-
-        //sort weightLevels by value in DESC order
-//        weightLevels.entrySet().stream()
-//                .sorted(Map.Entry.<Double, Integer>comparingByValue().reversed())
-//                .forEachOrdered(x -> System.err.println(x.getKey() + " " + x.getValue()));
+      //  System.err.println("minimum weight is: " + minimumWeight);
+        // weightLevels.entrySet().stream()
+        // .sorted(Map.Entry.<Double, Integer>comparingByValue().reversed())
+        // .forEachOrdered(entry -> System.err.println(entry.getKey() + " " + entry.getValue()));
 
     }
 
     private void gatherComparisons(List<AbstractBlock> blocks) {
         boolean cleanCleanER = blocks.get(0) instanceof BilateralBlock;
         blocks.clear();
-        //System.out.println(topKEdges.peek().getUtilityMeasure());
+        //  System.out.println(topKEdges.peek().getUtilityMeasure());
         blocks.add(getDecomposedBlock(cleanCleanER, topKEdges));
     }
 
     protected void getKThreshold(List<AbstractBlock> blocks) {
         long blockAssingments = 0;
 
-        //System.out.println("Blocks size: " + blocks.size());
+     //   System.out.println("Blocks size: " + blocks.size());
         for (AbstractBlock block : blocks) {
             blockAssingments += block.getTotalBlockAssignments();
             tbc += block.getNoOfComparisons();
+        //    System.out.println("total block ass: " + block.getTotalBlockAssignments());
+        //    System.out.println("comps: " + block.getNoOfComparisons());
         }
 
 //        kThreshold = Math.max(Math.round(blockAssingments *  (selectivity + 0.35)), Math.round(blockAssingments * 0.5));
 //        kThreshold = Math.min(kThreshold, Math.round(blockAssingments * 0.8));
         kThreshold = Math.round(blockAssingments);
+      //  System.out.println("kThreshold is: " + kThreshold);
+      //  System.out.println("tbc is: " + tbc);
+
 
 //        kThreshold = Math.min(Math.round(blockAssingments *  (selectivity + 0.35)), Math.round(blockAssingments * 0.8));
 
@@ -199,7 +207,7 @@ public class CardinalityEdgePruning extends AbstractMetablocking {
 
         Queue<Comparison> pqnew = new PriorityQueue<Comparison>((int) (2 * kThreshold - 180000), new ComparisonWeightComparator());
 
-
+    //    System.err.println("pq is: " + pq);
         while (pq.size() > (kThreshold - 180000)) {
             pqnew.add((Comparison) pq.poll());
             topKEdges.poll();
